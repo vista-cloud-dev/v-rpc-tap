@@ -1,0 +1,29 @@
+# Build output — ignore everything in dist/ EXCEPT the generated, committed
+# contract artifact (drift-gated *.json).
+/dist/*
+!/dist/*.json
+/bin/
+# Local root-built binary (symlinked onto PATH: ~/scripts/bin/v-rpc -> ./v-rpc)
+/v-rpc
+*.test
+# coverage report artifacts — specific/anchored so they never match a source
+# file named coverage.go (a broad `coverage.*` silently drops it from commits)
+/coverage.out
+coverage.html
+coverage.txt
+*.lcov
+
+# RPC capture artifacts — data, never source (even at level 2 = names only)
+*.ldjson
+# ...but committed fixtures under testdata/ are tracked reference data (PHI-free,
+# names-only level-2 captures).
+!testdata/*.ldjson
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code — personal/machine-local permissions (keep settings.json committed)
+.claude/settings.local.json

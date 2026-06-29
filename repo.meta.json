@@ -1,0 +1,9 @@
+{
+  "id": "tool:v-rpc-tap",
+  "repo": "https://github.com/vista-cloud-dev/v-rpc-tap",
+  "role": "VistA scalable RPC tap — the `v rpc-tap` domain. A durable, full-payload RPC-broker tap (XWBPRS splice -> per-job bounded ring -> read-only drain to S3) for high-volume capture. Ships the VSL RPC TAP M package (VSLRT* routines + KIDS build) plus the host arm/drain/validate tooling and the load-proof harness. High-risk, national Class-1-adjacent; built and proven dual-engine on our own gold-master engines before any VA offer. Sibling of the safe, read-only v-rpc-debug XWBDEBUG oracle; the two integrate only at the v-cli busybox as `v rpc-debug` / `v rpc-tap`.",
+  "language": ["go"],
+  "layer": "v",
+  "license": "AGPL-3.0",
+  "verification_commands": ["go test ./..."]
+}
