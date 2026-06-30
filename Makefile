@@ -32,7 +32,13 @@ m-coverage:
 m-test-dual:
 	$(MAKE) m-test ENGINE=ydb  DOCKER=m-test-engine
 	$(MAKE) m-test ENGINE=iris DOCKER=m-test-iris
-m-check: m-fmt-check m-lint m-test-dual m-coverage
+# D10 dependency-purity gate: VSLRT* reference no STD*/external-VSL*, no crypto/json/net
+m-purity:
+	./scripts/purity-check.sh
+# build the VSL RPC TAP KIDS transport global (VSLRT*1.0*1) from the declarative spec
+kids:
+	v pkg build kids/vslrtap.build.json --src src --out dist/kids/vslrtap.kids
+m-check: m-fmt-check m-lint m-purity m-test-dual m-coverage
 
 # --- Go side (host; empty until P3) ---
 go-build:

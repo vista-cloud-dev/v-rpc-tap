@@ -1,0 +1,13 @@
+{
+  "package": "VSLRT",
+  "version": "1.0",
+  "patch": "1",
+  "allowLongNames": true,
+  "components": {
+    "routines": [
+      "VSLRTAP",
+      "VSLRTH",
+      "VSLRTRP"
+    ]
+  }
+}
