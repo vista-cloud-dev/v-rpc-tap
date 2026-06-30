@@ -14,11 +14,13 @@ not here. This repo links to it rather than copying it:
   [`vista-cloud-dev/docs › proposals/v-rpc-tap-scalable.md`](https://github.com/vista-cloud-dev/docs/blob/main/proposals/v-rpc-tap-scalable.md)
 - **Implementation tracker (live status, P0–P4 + L1–L11):**
   [`docs › proposals/v-rpc-tap-scalable-implementation-tracker.md`](https://github.com/vista-cloud-dev/docs/blob/main/proposals/v-rpc-tap-scalable-implementation-tracker.md)
-- **Current resume prompt (P4 — live splice + install-gated remainder):**
-  [`docs › proposals/v-rpc-tap-scalable-p4-resume-prompt.md`](https://github.com/vista-cloud-dev/docs/blob/main/proposals/v-rpc-tap-scalable-p4-resume-prompt.md)
-  — paste into a fresh `v-rpc-tap`-cwd session to continue. The P3 host (CLI wiring,
-  drain-format hardening, drain→S3 pipeline core, L8 load rig) is **complete + gate-green**;
-  P4 is the splice/install-gated half (supersedes the earlier P1/F1/P2/P3 prompts beside it).
+- **Current resume prompt (P4 LIVE — live splice + load + egress + gates):**
+  [`docs › proposals/v-rpc-tap-scalable-p4-live-resume-prompt.md`](https://github.com/vista-cloud-dev/docs/blob/main/proposals/v-rpc-tap-scalable-p4-live-resume-prompt.md)
+  — paste into a fresh `v-rpc-tap`-cwd session to continue. **P4 step 1 is DONE**: the
+  foreign-overwrite splice build (XWBPRS splice + VSLRT* + #19 OPTION) is built and its
+  full `v pkg` install→verify→uninstall lifecycle is proven byte-clean on vehu (the
+  ZVPKGRD install blocker is fixed; the stress test fixed two v-pkg bugs). The remaining
+  P4 is the live-broker-nested half (supersedes the earlier P1/F1/P2/P3/P4 prompts beside it).
 - **Deep technical analysis (ground-truth-validated):**
   [`docs › proposals/considering/v-rpc-tap-scalable-deep-technical-analysis.md`](https://github.com/vista-cloud-dev/docs/blob/main/proposals/considering/v-rpc-tap-scalable-deep-technical-analysis.md)
 - **Adversarial review:**
