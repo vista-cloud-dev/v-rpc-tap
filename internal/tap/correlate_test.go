@@ -48,6 +48,21 @@ func TestCorrelateDedupesReDrainPreferringComplete(t *testing.T) {
 	}
 }
 
+// Summarize sums the per-job drop count (carried on every record of a job from the J
+// header) once per distinct job — not once per record — so re-drained/multi-record
+// jobs don't inflate the loss figure (R20 per-window accounting).
+func TestSummarizeDropsPerDistinctJob(t *testing.T) {
+	recs := []Record{
+		{Inc: "i1", Job: 100, Seq: 1, Mode: 1, RPC: "A", Drop: 4},
+		{Inc: "i1", Job: 100, Seq: 2, Mode: 1, RPC: "B", Drop: 4}, // same job → not double-counted
+		{Inc: "i2", Job: 200, Seq: 1, Mode: 1, RPC: "C", Drop: 3}, // different job → adds
+	}
+	got := Summarize(Correlate(recs))
+	if got.Dropped != 7 {
+		t.Errorf("Dropped = %d, want 7 (4 for job 100 + 3 for job 200, each counted once)", got.Dropped)
+	}
+}
+
 func TestCorrelateSegmentsByIncarnation(t *testing.T) {
 	// same $J reused across a reap -> distinct Inc -> two sessions, never conflated
 	recs := []Record{

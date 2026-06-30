@@ -19,6 +19,7 @@ type Summary struct {
 	Unpaired  int
 	NamesOnly int
 	EmptyName int
+	Dropped   int // records lost to in-path trim before this drain, summed once per distinct job (R20)
 }
 
 // Correlate groups records into sessions by (Inc, Job), de-duplicates re-drained
@@ -68,9 +69,12 @@ func prefer(candidate, incumbent Record) bool {
 	return len(candidate.Sub) > len(incumbent.Sub)
 }
 
-// Summarize tallies the per-window accounting across correlated sessions.
+// Summarize tallies the per-window accounting across correlated sessions. The drop
+// count is per-job (carried identically on every record of a job from the J header),
+// so it is summed once per distinct job — not once per record.
 func Summarize(sessions []Session) Summary {
 	s := Summary{Sessions: len(sessions)}
+	jobDrop := map[int]int{}
 	for _, sess := range sessions {
 		for _, m := range sess.Msgs {
 			s.Records++
@@ -85,7 +89,13 @@ func Summarize(sessions []Session) Summary {
 			if !m.Named() {
 				s.EmptyName++
 			}
+			if m.Drop > jobDrop[m.Job] {
+				jobDrop[m.Job] = m.Drop
+			}
 		}
+	}
+	for _, d := range jobDrop {
+		s.Dropped += d
 	}
 	return s
 }

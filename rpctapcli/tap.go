@@ -124,11 +124,12 @@ func (c *drainCmd) exec(cc *clikit.Context, t *host.Tap) error {
 		Unpaired  int    `json:"unpaired"`
 		NamesOnly int    `json:"namesOnly"`
 		EmptyName int    `json:"emptyName"`
-	}{c.Engine, sum.Sessions, sum.Records, sum.Complete, sum.Unpaired, sum.NamesOnly, sum.EmptyName}
+		Dropped   int    `json:"dropped"`
+	}{c.Engine, sum.Sessions, sum.Records, sum.Complete, sum.Unpaired, sum.NamesOnly, sum.EmptyName, sum.Dropped}
 	return cc.Result(data, func() {
 		fmt.Fprintf(cc.Stdout,
-			"drained %s: %d session(s), %d record(s) — %d complete, %d unpaired, %d names-only, %d empty-name\n",
-			data.Engine, data.Sessions, data.Records, data.Complete, data.Unpaired, data.NamesOnly, data.EmptyName)
+			"drained %s: %d session(s), %d record(s) — %d complete, %d unpaired, %d names-only, %d empty-name; %d dropped (pre-drain loss)\n",
+			data.Engine, data.Sessions, data.Records, data.Complete, data.Unpaired, data.NamesOnly, data.EmptyName, data.Dropped)
 	})
 }
 

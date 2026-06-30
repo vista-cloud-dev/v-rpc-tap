@@ -28,6 +28,7 @@ type Record struct {
 	Inc     string            // per-incarnation token (the segmentation key; same $J reused → new Inc)
 	Head    int               // job ring head at drain time
 	SeqMax  int               // job ring seqmax at drain time
+	Drop    int               // per-job cumulative drop count at drain time (from the J header; R20)
 	Ver     int               // record schema version
 	Kind    string            // capture kind ("req")
 	Horolog string            // $H capture timestamp

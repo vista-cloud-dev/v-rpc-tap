@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -128,14 +129,17 @@ func TestStatus_Disarmed(t *testing.T) {
 	}
 }
 
+// vnode builds a length-prefixed V node + value line in the VSLRTH drain wire format.
+func vnode(job, seq, sub, val string) string {
+	return fmt.Sprintf("V\t%s\t%s\t%s\t%d\n%s\n", job, seq, sub, len(val), val)
+}
+
 func TestDrain_CorrelatesAndSummarizes(t *testing.T) {
-	// One complete mode-2 record (req base + R result) on job 123.
-	drain := strings.Join([]string{
-		"J\t123\tabc\t0\t1",
-		"V\t123\t1\t\t1^req^66123,1^FOO\x02BAR\t2",
-		"V\t123\t1\tR\tHELLO",
-		"",
-	}, "\n")
+	// One complete mode-2 record (req base + R result) on job 123, with drop=4 carried
+	// on the J header so the verb can report per-window loss without a second call.
+	drain := "J\t123\tabc\t0\t1\t4\n" +
+		vnode("123", "1", "", "1^req^66123,1^FOO\x02BAR^2") +
+		vnode("123", "1", "R", "HELLO")
 	fe := &fakeExecer{out: func(string) (string, error) { return drain, nil }}
 	c := &drainCmd{Lo: 0, Hi: 0}
 	var buf bytes.Buffer
@@ -149,10 +153,11 @@ func TestDrain_CorrelatesAndSummarizes(t *testing.T) {
 		Sessions int `json:"sessions"`
 		Records  int `json:"records"`
 		Complete int `json:"complete"`
+		Dropped  int `json:"dropped"`
 	}
 	decode(t, &buf, &got)
-	if got.Sessions != 1 || got.Records != 1 || got.Complete != 1 {
-		t.Errorf("result = %+v, want 1 session / 1 record / 1 complete", got)
+	if got.Sessions != 1 || got.Records != 1 || got.Complete != 1 || got.Dropped != 4 {
+		t.Errorf("result = %+v, want 1 session / 1 record / 1 complete / 4 dropped", got)
 	}
 }
 

@@ -11,6 +11,8 @@ VSLRTHTST ; VSL RPC TAP — VSLRTH off-path host seam tests (YDB+IRIS)
  do tCommitTrimClamp(.pass,.fail)
  do tDrainSetsWatermarkNoDelete(.pass,.fail)
  do tDrainRangeScopesJobs(.pass,.fail)
+ do tJHeaderHasDrop(.pass,.fail)
+ do tVHeaderLengthPrefix(.pass,.fail)
  do report^STDASSERT(pass,fail)
  quit
  ;
@@ -85,4 +87,21 @@ tDrainRangeScopesJobs(pass,fail) ;@TEST "drain(lo,hi) only touches jobs in range
  do drain^VSLRTH(100,150)
  do eq^STDASSERT(.pass,.fail,$get(^XTMP("VSLRT","buf",100,"wm")),2,"job 100 drained")
  do true^STDASSERT(.pass,.fail,'$data(^XTMP("VSLRT","buf",200,"wm")),"job 200 out of range, untouched")
+ quit
+ ;
+tJHeaderHasDrop(pass,fail) ;@TEST "drain J header carries the per-job drop count (R20: per-window accounting, no second call)"
+ kill ^XTMP("VSLRT") do seed(100,3)
+ set ^XTMP("VSLRT","buf",100,"drop")=7
+ new line set line=$$jhdr^VSLRTH(100,1,3)
+ do eq^STDASSERT(.pass,.fail,$piece(line,$char(9),1),"J","row prefix J")
+ do eq^STDASSERT(.pass,.fail,$piece(line,$char(9),5),3,"5th field = seqmax")
+ do eq^STDASSERT(.pass,.fail,$piece(line,$char(9),6),7,"6th field = drop count (appended)")
+ quit
+ ;
+tVHeaderLengthPrefix(pass,fail) ;@TEST "V node header length-prefixes the value (binary-safe framing for embedded TAB/newline)"
+ new v,line
+ set v="a"_$char(9)_"b"_$char(10)_"c" ; 5 bytes, with an embedded TAB and an embedded newline
+ set line=$$vhdr^VSLRTH(100,1,"",v)
+ do eq^STDASSERT(.pass,.fail,$piece(line,$char(9),1),"V","row prefix V")
+ do eq^STDASSERT(.pass,.fail,$piece(line,$char(9),5),5,"5th field = $length(value) = 5 (framing won't mis-split on the embedded bytes)")
  quit

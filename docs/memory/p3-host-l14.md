@@ -27,20 +27,28 @@ ring node that rsp augments. The host's job is therefore:
   copy that carries a result** (a later drain caught rsp). `tolerate` is the contract:
   unpaired/empty-name records are kept + counted, never dropped or errored.
 
-**Two drain wire-format follow-ups surfaced (NOT yet done — both are small VSLRTH
-changes, deferrable):**
-1. **Not binary-safe.** The tab-delimited, `\n`-terminated J/V format breaks if a
-   captured payload value contains a byte sequence `\nV\t…` or `\nJ\t…` (mis-read as a
-   new row). `ParseDrain` joins plain continuation lines (embedded `\n` not followed
-   by a row prefix) and keeps embedded TABs (SplitN limit 5), so the common case is
-   safe — but the real fix is a **length-prefixed drain** in VSLRTH. Record/result
-   *values* don't affect L14 correlation (which keys on inc/job/seq + name + result
-   presence), so this is a payload-fidelity hardening, not an L14 blocker.
-2. **Drop count not surfaced.** Per-window **drop accounting (R20)** needs the
-   trim-drop count, which lives at `^XTMP("VSLRT","buf",job,"drop")` and is **NOT**
-   emitted by `drain` (the J header carries job/inc/head/seqmax only). Add `drop` to
-   the drain J header (backward-compatible append) so the host can report loss without
-   a second status call. Until then `ParseDrain` exposes Head/SeqMax but not drops.
+**Two drain wire-format follow-ups — DONE (2026-06-30, dual-engine + Go gate green):**
+1. **Binary-safe via a length-prefixed value line.** The J/V header lines stay
+   TAB-framed (they hold only controlled tokens — integers, the inc token, a `$C(2)`-
+   joined subpath of controlled subscripts), but the one arbitrary field — the captured
+   value — moved to its **own length-prefixed line**: `V…\t<bytelen>\n<value bytes>\n`.
+   `ParseDrain` reads exactly `bytelen` bytes (`io.ReadFull` over a `bufio.Reader`, not a
+   line `Scanner`), so a value containing TAB/`\n` or even a forged `\nV\t…` row prefix
+   can **never** be mis-split (the old continuation-join heuristic is gone). On the M
+   side the line construction is now pure functions **`$$jhdr(job,head,sm)` / `$$vhdr(job,
+   seq,sp,v)`** (`vhdr` emits `$length(v)`) — `drain`/`dumpNode` just `write $$…,!` then
+   `write v,!`. That refactor is what makes the wire format **unit-testable in M without
+   device capture** (assert the returned line's pieces); device-capture in the STDASSERT
+   harness is impractical.
+2. **Drop count surfaced in the J header.** `$$jhdr` appends `\t<drop>` (the per-job
+   cumulative `^XTMP("VSLRT","buf",job,"drop")`) as a 6th field — a **backward-compatible
+   append** (`ParseDrain` tolerates a 5-field header, drop→0). `Record.Drop` carries it;
+   `Summarize` adds `Summary.Dropped` = the drop summed **once per distinct job** (every
+   record of a job repeats the same header value, so summing per-record would inflate it).
+   The `drain` verb now reports per-window loss with no second status call (R20).
+   *Limitation:* a job with drops but zero live records emits a J line with no V lines, so
+   no `Record` carries its drop — that count is in the stream but not in `Summary.Dropped`
+   (rare; a fuller fix would return per-job headers from `ParseDrain`).
 
 **Command surface logic built** (`internal/host`, also v-pkg-independent): the `Tap`
 controller drives VSLRTH (`arm/disarm/status/drain/committrim`) over an `Execer` seam
@@ -73,5 +81,5 @@ controller. Durable points:
 
 Remaining P3 slices: the live smoke (when v-pkg install is healthy); the read-only `drain → S3
 (GovCloud partition) → committrim-after-ack` pipeline (D12); `validate` vs the native XWBDEBUG
-oracle; drain-format hardening (binary-safe length-prefix + drop-count in the J header — the two
-follow-ups above). See the central tracker P3 section.
+oracle. (Drain-format hardening — binary-safe length-prefix + drop-count — is now DONE, above.)
+See the central tracker P3 section.

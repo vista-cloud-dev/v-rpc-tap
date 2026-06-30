@@ -3,7 +3,7 @@ package host
 import (
 	"context"
 	"errors"
-	"strings"
+	"fmt"
 	"testing"
 )
 
@@ -73,13 +73,14 @@ func TestStatusDisarmedEmptyOn(t *testing.T) {
 	}
 }
 
+// vnode builds a length-prefixed V node + value line in the VSLRTH drain wire format.
+func vnode(job, seq, sub, val string) string {
+	return fmt.Sprintf("V\t%s\t%s\t%s\t%d\n%s\n", job, seq, sub, len(val), val)
+}
+
 func TestDrainParsesAndCorrelates(t *testing.T) {
-	drain := strings.Join([]string{
-		"J\t100\t67751,40000-1\t1\t1",
-		"V\t100\t1\t\t1^req^67751,40001^ORWU DT^1",
-		"J\t200\t67751,40000-2\t1\t1",
-		"V\t200\t1\t\t1^req^67751,40002^ORWPT LIST^1",
-	}, "\n") + "\n"
+	drain := "J\t100\t67751,40000-1\t1\t1\t0\n" + vnode("100", "1", "", "1^req^67751,40001^ORWU DT^1") +
+		"J\t200\t67751,40000-2\t1\t1\t0\n" + vnode("200", "1", "", "1^req^67751,40002^ORWPT LIST^1")
 	f := &fakeExecer{out: map[string]string{"do drain^VSLRTH(0,0)": drain}}
 	sessions, err := New(f).Drain(context.Background(), 0, 0)
 	if err != nil {

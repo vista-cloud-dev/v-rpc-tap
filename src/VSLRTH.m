@@ -8,10 +8,17 @@ VSLRTH ; VSL RPC TAP — off-path host seam (arm/disarm/status/drain/committrim)
  ; I/O here is fine — the zero-I/O rule (CF4) binds VSLRTAP on the broker socket, not
  ; VSLRTH. Returns RAW bytes; ALL encoding/correlation/crypto/JSON is host-side (D10).
  ;
- ; drain wire format (one line per node; tab-delimited; \n-terminated):
- ;   J <TAB> job <TAB> inc <TAB> head <TAB> seqmax        — per-job header
- ;   V <TAB> job <TAB> seq <TAB> subpath <TAB> value      — one ring node ($C(2)-joined subpath)
- ; subpath = the subscripts BEYOND ...,buf,job,seq ("" = the record node itself).
+ ; drain wire format (length-prefixed, binary-safe):
+ ;   J <TAB> job <TAB> inc <TAB> head <TAB> seqmax <TAB> drop   <LF>   — per-job header
+ ;   V <TAB> job <TAB> seq <TAB> subpath <TAB> bytelen          <LF>   — one ring node header
+ ;   <value: exactly bytelen bytes, may contain TAB or LF>      <LF>   — the node's value payload
+ ; The J/V header lines hold only controlled tokens (integers, the inc token, and a
+ ; $C(2)-joined subpath of controlled subscripts), so they stay TAB-framed. The only
+ ; arbitrary bytes — the captured value — are moved to their own LENGTH-PREFIXED line
+ ; (bytelen = $length of the value): the host reads exactly that many bytes, so a value
+ ; containing TAB/LF (or even the byte sequence "<LF>V<TAB>...") can never be mis-split.
+ ; subpath = the subscripts BEYOND ...,buf,job,seq ("" = the record node itself). drop =
+ ; the per-job cumulative drop count (R20 per-window accounting needs no second call).
  quit
  ;
 arm(mode,ttl,dur) ; host: arm capture. mode=1|2; ttl=lease secs; dur=duration secs (0=indefinite)
@@ -51,7 +58,7 @@ drain(lo,hi) ; host: dump live records for jobs in [lo,hi] (0,0=all) to device; 
  . quit:lo&(j<lo)
  . quit:hi&(j>hi)
  . set head=$get(^XTMP("VSLRT","buf",j,"head"),1),sm=$get(^XTMP("VSLRT","buf",j,"seq"))
- . write "J",$char(9),j,$char(9),$get(^XTMP("VSLRT","buf",j,"inc")),$char(9),head,$char(9),sm,!
+ . write $$jhdr(j,head,sm),!
  . do dumpJob(j,head,sm)
  . set ^XTMP("VSLRT","buf",j,"wm")=sm ; drained-up-to watermark; in-path trim won't cross it
  quit
@@ -65,12 +72,20 @@ dumpJob(job,head,sm) ; emit every live ring node for <job> (seq head..sm), skipp
  . for  set ref=$query(@ref) quit:ref=""  quit:$qsubscript(ref,4)'=seq  do dumpNode(job,seq,ref)
  quit
  ;
-dumpNode(job,seq,ref) ; one node -> "V<TAB>job<TAB>seq<TAB>subpath<TAB>value"
- new d,p,sp
+dumpNode(job,seq,ref) ; one node -> the V header line, then the length-prefixed value bytes
+ new d,p,sp,v
  set d=$qlength(ref),sp=""
  for p=5:1:d set sp=sp_$select(p>5:$char(2),1:"")_$qsubscript(ref,p)
- write "V",$char(9),job,$char(9),seq,$char(9),sp,$char(9),$get(@ref),!
+ set v=$get(@ref)
+ write $$vhdr(job,seq,sp,v),!
+ write v,!
  quit
+ ;
+jhdr(job,head,sm) ; build the per-job J header line: "J<TAB>job<TAB>inc<TAB>head<TAB>seqmax<TAB>drop"
+ quit "J"_$char(9)_job_$char(9)_$get(^XTMP("VSLRT","buf",job,"inc"))_$char(9)_head_$char(9)_sm_$char(9)_+$get(^XTMP("VSLRT","buf",job,"drop"))
+ ;
+vhdr(job,seq,sp,v) ; build a V node header line: "V<TAB>job<TAB>seq<TAB>subpath<TAB>bytelen" (bytelen = $length of the value that follows)
+ quit "V"_$char(9)_job_$char(9)_seq_$char(9)_sp_$char(9)_$length(v)
  ;
 plus(h,secs) ; return the $H value <h> advanced by <secs> seconds (handles day rollover)
  new d,s
