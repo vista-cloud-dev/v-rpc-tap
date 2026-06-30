@@ -1,6 +1,6 @@
 ---
 name: p3-host-l14
-description: The P3 Go host's drain-parse + L14 per-message correlation contract (internal/tap) — why a ring record IS one message (not a req/rsp pair to join), and the two drain wire-format gaps (binary-safety + drop-count not surfaced) that are follow-ups.
+description: The P3 Go host — drain-parse + L14 per-message correlation (internal/tap), the host.Tap controller (internal/host), and the rpctapcli CLI verbs (arm/disarm/status/drain/committrim) — why a ring record IS one message (not a req/rsp pair to join), the verb Run/exec split for engine-free testing, the VRPCTAP_ env prefix, and the two drain wire-format follow-ups (binary-safety + drop-count).
 metadata:
   type: project
 ---
@@ -51,9 +51,27 @@ controller drives VSLRTH (`arm/disarm/status/drain/committrim`) over an `Execer`
 (waterline rule 3); the interface exists only so the command logic is testable without
 an engine.
 
-Next P3 slices: the real `mdriverExecer` adapter + `engineConn` knobs + the kong CLI
-verbs in `rpctapcli` (mirror v-rpc-debug; pulls the clikit/mdriver dep tree) + a live
-smoke — the smoke is **gated on `VSLRTH` being on an engine** (the v-pkg install path,
-currently the `ZVPKGRD` snag in [[reaper-live-proof]]). Then the read-only `drain → S3
-(GovCloud partition) → committrim-after-ack` pipeline (D12) and `validate` vs the native
-XWBDEBUG oracle. See the central tracker P3 section.
+**P3 CLI wiring DONE** (`rpctapcli`, dep-wired + table-tested, gate-green): the real
+`mdriverExecer` (adapts `mdriver.Client.ExecEval` → `host.Execer`; an `EngineError`
+becomes a Go error) + `engineConn` knobs + the kong `Control` verbs **arm / disarm /
+status / drain / committrim** mounted on `Commands`, each delegating to the `host.Tap`
+controller. Durable points:
+- **Each verb splits `Run` (resolves the Execer over the driver seam) from `exec(cc, *host.Tap)`
+  (the testable logic).** The shared `run()` prologue does `execer()→host.New(ex)→exec`; tests
+  drive `exec` with a fake Execer (no engine), so command-string generation + result shaping are
+  verified bare. Build a `*clikit.Context{Stdout, Stderr, Format}` literal in tests — Result's
+  JSON/text paths need no theme.
+- **Env prefix is `VRPCTAP_*`, NOT v-rpc-debug's `VRPC_*`** — deliberately distinct so the two
+  domains don't collide on process-global env when both are mounted under one `v` umbrella process.
+- **v-rpc-tap imports the SHARED `clikit` v0.7.0 + `m-driver-sdk` v0.3.0** — it is a generic `v`
+  CLI consumer, NOT a driver, so it correctly takes the shared clikit module (do NOT "fix" it to
+  the contract-bearing driver fork — see [[driver-clikit-fork]]). `make go-build` resolves via the
+  root go.work; go.mod pins the real versions for the `GOWORK=off` CI build.
+- **Live smoke DEFERRED** (gated on `VSLRTH` being installed on an engine = the v-pkg install path,
+  the `ZVPKGRD` snag in [[reaper-live-proof]]); the uncovered `rpctapcli` lines are exactly those
+  engine-bound `Run`/`execer` paths.
+
+Remaining P3 slices: the live smoke (when v-pkg install is healthy); the read-only `drain → S3
+(GovCloud partition) → committrim-after-ack` pipeline (D12); `validate` vs the native XWBDEBUG
+oracle; drain-format hardening (binary-safe length-prefix + drop-count in the J header — the two
+follow-ups above). See the central tracker P3 section.
