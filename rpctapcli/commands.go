@@ -23,4 +23,6 @@ type Commands struct {
 	CommitTrim commitTrimCmd `cmd:"" name:"committrim" group:"Control" help:"Trim the durable ring prefix after a drain is safe in S3 (at-least-once)." example:"v rpc-tap committrim --container vehu --job 123 --seq 42"`
 
 	Load loadCmd `cmd:"" group:"Bench" help:"Drive concurrent [XWB] sessions at a broker and report throughput + latency (L8 load rig)." example:"v rpc-tap load --addr 127.0.0.1:9430 --concurrency 50 --total 500"`
+
+	Splice spliceCmd `cmd:"" group:"Build" help:"Regenerate the foreign-overwrite XWBPRS routine for the KIDS build from a site's current XWBPRS (build input; never installs)." example:"v rpc-tap splice --in XWBPRS.m --out generated/XWBPRS.m"`
 }

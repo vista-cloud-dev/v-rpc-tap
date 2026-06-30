@@ -136,6 +136,30 @@ func TestSplice_RefusesIfCapiAnchorMissing(t *testing.T) {
 	}
 }
 
+func TestGenerate_BytesRoundTripPreservesTrailingNewline(t *testing.T) {
+	src := []byte(strings.Join(callpBlock, "\n") + "\n")
+	out, err := Generate(src)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if !strings.HasSuffix(string(out), "\n") {
+		t.Error("Generate dropped the trailing newline")
+	}
+	got := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+	if indexOf(got, "D req^VSLRTAP") < 0 || indexOf(got, ". D rsp^VSLRTAP") < 0 {
+		t.Errorf("Generate output missing a spliced call:\n%s", out)
+	}
+	if len(got) != len(callpBlock)+2 {
+		t.Errorf("Generate produced %d lines, want %d", len(got), len(callpBlock)+2)
+	}
+}
+
+func TestGenerate_PropagatesRefusal(t *testing.T) {
+	if _, err := Generate([]byte("XWBPRS ;header\n Q\n")); err == nil {
+		t.Fatal("Generate of a non-XWBPRS routine succeeded; want refusal")
+	}
+}
+
 func TestSplice_RefusesIfNoCallpLabel(t *testing.T) {
 	if _, err := Splice([]string{`XWBPRS ;header`, ` ;;1.1;RPC BROKER;**67**;`, ` Q`}); err == nil {
 		t.Fatal("Splice with no CALLP label succeeded; want refusal")

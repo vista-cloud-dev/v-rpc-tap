@@ -22,6 +22,25 @@ import (
 	"strings"
 )
 
+// Generate is the byte-level form of Splice for the build/CLI: it takes a routine
+// source file's bytes (as pulled from the site over the driver), splices it, and
+// returns the spliced file bytes. A single trailing newline is preserved (M
+// routine files end in one); the line content is otherwise byte-faithful.
+func Generate(src []byte) ([]byte, error) {
+	s := string(src)
+	trailingNL := strings.HasSuffix(s, "\n")
+	s = strings.TrimSuffix(s, "\n")
+	out, err := Splice(strings.Split(s, "\n"))
+	if err != nil {
+		return nil, err
+	}
+	res := strings.Join(out, "\n")
+	if trailingNL {
+		res += "\n"
+	}
+	return []byte(res), nil
+}
+
 // Splice inserts the two tap calls into a CALLP^XWBPRS source and returns the
 // spliced source (one string per routine line, no trailing newlines; line 2 / the
 // patch string is left untouched — versioning is the build's job). It refuses —
