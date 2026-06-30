@@ -32,11 +32,22 @@ and analyses.
 
 ## Layout
 
+This is a **hybrid Go+M `v` repo** — the first in the org. The M routines + KIDS
+build live here (not in `v-stdlib`) by deliberate decision (proposal D2): the tap
+**mutates a national, checksum-audited routine** (`XWBPRS`), so it does **not**
+belong in the additive-only "VistA Standard Library." The M apparatus mirrors
+`v-stdlib`; the Go host mirrors `v-rpc-debug`.
+
 ```
-rpctapcli/   importable command surface (mounted as `v rpc-tap` — empty until P3)
-m/           VSL RPC TAP M routines (VSLRTAP/VSLRTRP/VSLRTH) — added in P1
-kids/        VSL RPC TAP KIDS build spec                     — added in P1
+src/         VSL RPC TAP M routines (VSLRTAP/VSLRTRP/VSLRTH)  — P1a
+tests/       M unit tests (VSLRT*TST.m, STDASSERT)            — P1a
+kids/        VSL RPC TAP KIDS build spec (vslrtap.build.json) — P1a
+.m-cli.toml  M lint/fmt config (modern, dual-engine)          — P1a
+rpctapcli/   importable Go command surface (mounted `v rpc-tap` — empty until P3)
 docs/        proposal pointers, tracker, memory
 ```
+
+M side: `m test`/`m coverage`/`m lint` (engine work through the driver stack only).
+Go side: `go test ./...`. The root `Makefile` runs both.
 
 License: AGPL-3.0 (see `LICENSE`).

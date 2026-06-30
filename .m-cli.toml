@@ -1,0 +1,16 @@
+# m-cli configuration — VSL RPC TAP M package (modern pythonic-lower, not
+# VistA-compact). Ships the VSLRT* routines (in-path tap + reaper + host seam);
+# dual-engine (YDB + IRIS). NOTE: unlike v-stdlib's additive VSL* routines, this
+# package MUTATES a national routine (XWBPRS splice) — isolated in its own repo
+# by design (proposal D2). The routines themselves reference NO STD*/VSL* (D10
+# purity gate); only the *tests* pull in STDASSERT from m-stdlib.
+
+[lint]
+rules = "modern"
+target-engine = "any"
+
+[fmt]
+rules = "pythonic-lower"
+
+[lsp]
+"hover.format" = "markdown"
