@@ -72,5 +72,19 @@ driver path), replicating `VSLRTLTST`'s injections with a sentinel outer `$ETRAP
 Fidelity honestly stated: non-interference + capture = real socket through the live
 broker; fault path = real installed routine on the real engine under a sentinel outer
 trap (not socket-driven — a socket-driven tap fault isn't achievable without a fault
-hook in the routine, which we will not ship). **OWED: mirror the whole cycle on foia
-(IRIS)** — `--engine iris`, broker host `19430`, `M_IRIS_*` creds.
+hook in the routine, which we will not ship).
+
+## foia (IRIS) MIRROR DONE 2026-06-30 — both-engine gate MET
+Same cycle on foia (`--engine iris --transport docker`, broker host `127.0.0.1:19430`,
+`M_IRIS_BIN` set): install (status 3) → arm → drive 3 RPCs → ring 4 records → fault
+probes all `bt=0 on=0 dx=dy=0`, naked=22 → uninstall (`verifyClean:clean`,
+`foreignRestore:exact`) → byte-clean. **Non-interference PASS** (armed==control
+byte-identical; XUS INTRO MSG is 801B on foia vs 1780B on vehu — different instance MOTD,
+each engine diffed against its own control). L1-L3 green on **both** engines; both gold
+masters pristine.
+
+**GOTCHA — `m-iris sync diff XWBPRS` is a FALSE NEGATIVE for the live splice:** after a
+successful IRIS install it reported `unified:""` (looked unspliced) even though the splice
+WAS live. It compares a mirror/export, not the running routine. **On IRIS, verify routine
+state via `m vista exec` `$T(CALLP+10^XWBPRS)` / `$T(+1^VSLRTAP)`, NOT `sync diff`.** (On
+YDB `sync diff` is reliable.)
