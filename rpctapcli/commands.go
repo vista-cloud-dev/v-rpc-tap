@@ -22,7 +22,8 @@ type Commands struct {
 	Drain      drainCmd      `cmd:"" group:"Control" help:"Pull live records, correlate into sessions; deletes nothing (D12)." example:"v rpc-tap drain --container vehu"`
 	CommitTrim commitTrimCmd `cmd:"" name:"committrim" group:"Control" help:"Trim the durable ring prefix after a drain is safe in S3 (at-least-once)." example:"v rpc-tap committrim --container vehu --job 123 --seq 42"`
 
-	Load loadCmd `cmd:"" group:"Bench" help:"Drive concurrent [XWB] sessions at a broker and report throughput + latency (L8 load rig)." example:"v rpc-tap load --addr 127.0.0.1:9430 --concurrency 50 --total 500"`
+	Load  loadCmd  `cmd:"" group:"Bench" help:"Drive concurrent [XWB] sessions at a broker and report throughput + latency (L8 load rig)." example:"v rpc-tap load --addr 127.0.0.1:9430 --concurrency 50 --total 500"`
+	Drive driveCmd `cmd:"" group:"Bench" help:"Open ONE broker session (full handshake) and fire RPCs in order, reporting exact response bytes (the live L1-L3 driver)." example:"v rpc-tap drive --addr 127.0.0.1:9430 --rpc 'XUS INTRO MSG'"`
 
 	Splice spliceCmd `cmd:"" group:"Build" help:"Regenerate the foreign-overwrite XWBPRS routine for the KIDS build from a site's current XWBPRS (build input; never installs)." example:"v rpc-tap splice --in XWBPRS.m --out generated/XWBPRS.m"`
 }
