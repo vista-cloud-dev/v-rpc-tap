@@ -1,6 +1,7 @@
 package load
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net"
@@ -8,9 +9,10 @@ import (
 	"time"
 )
 
-// fakeBroker is an in-process TCP server standing in for the RPC broker: it reads one
-// [XWB] message and replies with a short reject, so the harness exercises the real
-// dial/write/read path with no live engine. delay simulates per-call cost.
+// fakeBroker is an in-process TCP server standing in for the RPC broker: per connection
+// it accepts the TCPConnect handshake then replies to each RPC with a short data packet
+// (and to #BYE# by closing), so the harness exercises the real handshake/fire/bye client
+// path with no live engine. delay simulates per-call cost.
 func fakeBroker(t *testing.T, delay time.Duration) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -26,16 +28,47 @@ func fakeBroker(t *testing.T, delay time.Duration) string {
 			}
 			go func(c net.Conn) {
 				defer c.Close()
-				buf := make([]byte, 256)
-				_, _ = c.Read(buf)
-				if delay > 0 {
-					time.Sleep(delay)
+				for {
+					msg, rerr := readEOT(c)
+					if len(msg) == 0 {
+						return
+					}
+					if delay > 0 {
+						time.Sleep(delay)
+					}
+					switch {
+					case bytes.Contains(msg, []byte("TCPConnect")):
+						_, _ = c.Write([]byte("\x00\x00accept\x04"))
+					case bytes.Contains(msg, []byte("#BYE#")):
+						_, _ = c.Write([]byte("\x00\x00#BYE#\x04"))
+						return
+					default:
+						_, _ = c.Write([]byte("\x00\x00DATA\x04"))
+					}
+					if rerr != nil {
+						return
+					}
 				}
-				_, _ = c.Write([]byte("\x00\x00reject\x04"))
 			}(conn)
 		}
 	}()
 	return ln.Addr().String()
+}
+
+// readEOT reads from c until the 0x04 EOT that terminates each [XWB] message.
+func readEOT(c net.Conn) ([]byte, error) {
+	var buf []byte
+	tmp := make([]byte, 256)
+	for {
+		n, err := c.Read(tmp)
+		buf = append(buf, tmp[:n]...)
+		if bytes.IndexByte(tmp[:n], 0x04) >= 0 {
+			return buf, nil
+		}
+		if err != nil {
+			return buf, err
+		}
+	}
 }
 
 func TestRun_DrivesLoadAndInstruments(t *testing.T) {

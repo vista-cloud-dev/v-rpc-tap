@@ -10,8 +10,9 @@ import (
 	"github.com/vista-cloud-dev/clikit"
 )
 
-// fakeBroker is an in-process TCP server: it reads the [XWB] message and replies, so
-// the load verb exercises the real client path with no engine.
+// fakeBroker is an in-process TCP server that accepts the TCPConnect handshake then
+// replies to each RPC, so the load verb exercises the real handshake/fire client path
+// with no engine.
 func fakeBroker(t *testing.T) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -27,8 +28,25 @@ func fakeBroker(t *testing.T) string {
 			}
 			go func(c net.Conn) {
 				defer c.Close()
-				_, _ = c.Read(make([]byte, 256))
-				_, _ = c.Write([]byte("\x00reject\x04"))
+				buf := make([]byte, 1024)
+				for {
+					n, rerr := c.Read(buf)
+					if n > 0 {
+						msg := buf[:n]
+						switch {
+						case bytes.Contains(msg, []byte("TCPConnect")):
+							_, _ = c.Write([]byte("\x00\x00accept\x04"))
+						case bytes.Contains(msg, []byte("#BYE#")):
+							_, _ = c.Write([]byte("\x00\x00#BYE#\x04"))
+							return
+						default:
+							_, _ = c.Write([]byte("\x00\x00DATA\x04"))
+						}
+					}
+					if rerr != nil {
+						return
+					}
+				}
 			}(conn)
 		}
 	}()

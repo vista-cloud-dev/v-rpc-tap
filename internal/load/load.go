@@ -4,24 +4,25 @@
 // TCP socket (the CPRS-equivalent, like v-rpc-debug's ping) — it does NOT reach the M
 // engine, so it takes a broker address, not the m-driver seam.
 //
-// The rig is the engineering deliverable; it runs standalone now against an unspliced
-// broker (the CONTROL run). The ARMED measurement — the same run with the VSL RPC TAP
-// spliced into the dispatch path, to read off the latency tax — waits on the live
-// splice (the v-pkg install path). Delta() computes the control-vs-armed overhead once
-// both runs exist.
+// Each worker holds ONE persistent broker.Session: it completes the TCPConnect handshake
+// once, then fires its share of RPCs through that session (each Fire reaches MAIN->
+// CALLP^XWBPRS, the splice point), then #BYE#s on close. This both models a real CPRS
+// client (one session, many RPCs) and is what makes the ARMED run actually exercise the
+// tap — a handshake-less per-RPC dial is rejected at NEW^XWBTCPM before CALLP (see
+// internal/broker). Run the rig against an unspliced broker for the CONTROL baseline and
+// again with the splice installed + armed for the ARMED run; Delta() reads off the tax.
 package load
 
 import (
 	"context"
 	"fmt"
 	"math"
-	"net"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/vista-cloud-dev/v-rpc-tap/internal/xwbwire"
+	"github.com/vista-cloud-dev/v-rpc-tap/internal/broker"
 )
 
 // Config parameterizes a load run. Provide either Total (a fixed number of RPCs across
@@ -71,9 +72,10 @@ type Report struct {
 	Max         time.Duration `json:"maxNs"`
 }
 
-// Run drives the load and returns the instrumented report. Per the broker protocol each
-// RPC uses a fresh connection (an unauthenticated message may end the job after one
-// exchange), exactly as the ping client does.
+// Run drives the load and returns the instrumented report. Each worker establishes one
+// persistent broker.Session (handshake) and fires its claimed RPCs through it; a worker
+// that can't establish (or whose session breaks) still claims and FAILS its budget units
+// so nothing is silently dropped.
 func Run(ctx context.Context, cfg Config) (Report, error) {
 	if err := cfg.validate(); err != nil {
 		return Report{}, err
@@ -94,6 +96,12 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
+			// One session per worker: handshake once, fire many (real CPRS shape). A
+			// dead deadErr makes every subsequently-claimed unit a failure.
+			sess, deadErr := broker.Dial(cfg.Addr, cfg.Timeout)
+			if sess != nil {
+				defer func() { _ = sess.Close() }()
+			}
 			for i := 0; ; i++ {
 				if cfg.Total > 0 {
 					if atomic.AddInt64(&remaining, -1) < 0 {
@@ -103,7 +111,16 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 					return // duration elapsed / canceled
 				}
 				name := cfg.Mix[i%len(cfg.Mix)]
-				samples[w] = append(samples[w], fire(cfg.Addr, name, cfg.Timeout))
+				if deadErr != nil {
+					samples[w] = append(samples[w], sample{err: deadErr}) // no session — fail the unit
+					continue
+				}
+				t0 := time.Now()
+				_, ferr := sess.Fire(name)
+				samples[w] = append(samples[w], sample{lat: time.Since(t0), err: ferr})
+				if ferr != nil {
+					deadErr = ferr // session broken: remaining claimed units count as failed
+				}
 			}
 		}(w)
 	}
@@ -117,24 +134,6 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 	rep := summarize(all, elapsed, cfg.Concurrency)
 	rep.Addr = cfg.Addr
 	return rep, nil
-}
-
-// fire opens a fresh connection, sends one RPC, drains the reply, and times the whole
-// exchange. A dial/write error yields a failed sample (never silently dropped).
-func fire(addr, name string, timeout time.Duration) sample {
-	t0 := time.Now()
-	conn, err := net.DialTimeout("tcp", addr, timeout)
-	if err != nil {
-		return sample{err: err}
-	}
-	defer conn.Close()
-	if _, err := conn.Write(xwbwire.RPCMessage(name)); err != nil {
-		return sample{err: err}
-	}
-	_ = conn.SetReadDeadline(time.Now().Add(timeout))
-	buf := make([]byte, 512)
-	_, _ = conn.Read(buf) // a reply (often a reject) or timeout — both count as sent
-	return sample{lat: time.Since(t0)}
 }
 
 // summarize reduces samples into a Report: throughput over elapsed, and latency
