@@ -14,7 +14,7 @@ M       ?= m
 ENGINE  ?= ydb
 DOCKER  ?= m-test-engine
 MSTDLIB ?= ../m-stdlib
-TESTS   := tests/VSLRTAPTST.m tests/VSLRTHTST.m tests/VSLRTRPTST.m tests/VSLRTLTST.m
+TESTS   := tests/VSLRTAPTST.m tests/VSLRTHTST.m tests/VSLRTRPTST.m tests/VSLRTLTST.m tests/VSLRTCTST.m
 ENGINE_FLAGS := --engine $(ENGINE) --docker $(DOCKER)
 MIN_COVER ?= 85
 
