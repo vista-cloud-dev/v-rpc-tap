@@ -43,9 +43,34 @@ connection-test routine, `TEST(IP,PORT)`), so they are known-good, not hand-deri
   reports each response's exact length + hex → control-vs-armed byte diff for L1-L3
   non-interference (CF4). A broker TCP client (`--addr`), not the engine seam.
 
-## How L1-L3 live will use it (next increment)
-Install splice → `arm` the tap → `drive --rpc …` → `drain` ring confirms `req^VSLRTAP`
-fired inside the REAL broker job (= nested in the live `$ETRAP="D ETRAP^XWBTCPM(0)"`,
-`XWBTCPM:158`). Non-interference = response bytes identical armed vs disarmed. L2 fault
-injection needs typed malformed param chunks via `FireRaw` (build `RPCWithParams` then).
-See the central tracker `proposals/v-rpc-tap-scalable-implementation-tracker.md` L1-L3.
+## L1-L3 PROVEN LIVE on vehu (YDB), 2026-06-30 — recipe + the method split
+Full cycle, gold master left byte-clean (`v pkg` only): build kids from the site's
+current XWBPRS (`sync diff` empty vs static → valid §12 input) → `v pkg install
+--auto-snapshot` (status 3, splice live) → `arm --mode 2` → `drive --rpc …` (3 RPCs) →
+`status` records=4 / `drain` (complete=2, unpaired=2, emptyName=1) → `v pkg uninstall
+--restore --verify` (partition, `verifyClean:clean`, `foreignRestore:exact`) → `K
+^XTMP("VSLRT")` → `sync diff` empty + routines gone.
+
+- **L1 capture (wire-driven):** driving real RPCs via the handshake `Session` made
+  `req^/rsp^VSLRTAP` fire inside the REAL broker job — 4 ring records from 3 RPCs.
+- **Non-interference (wire-driven, byte-exact):** the `drive` verb's response hex is
+  **identical armed vs unspliced control** for every RPC (XWB IM HERE 4B, XUS INTRO MSG
+  1780B, XWB GET VARIABLE VALUE 90B) → the tap adds ZERO wire bytes (CF4). This is the
+  real-socket proof Option B promised.
+
+**METHOD SPLIT — durable lesson: you CANNOT force a tap-specific fault through the wire.**
+The broker walks the same params (PRS5 LINST/GINST) *before* the tap, so a malformed
+param faults the broker, not the tap. So the L1-fault/L2/L3 **fault path** is proven
+**in-engine against the REAL installed routine** via `m vista exec` (the sanctioned
+driver path), replicating `VSLRTLTST`'s injections with a sentinel outer `$ETRAP` and a
+`$X/$Y` delta as the CF4 proxy:
+- req fault (`XWB(5,"P",1)="^"` → capParams UNDEF/NAKED): `bt=0` (outer broker trap never
+  fired), `sent=1` (control returns), `on=0` (self-disabled), `$EC` clean, `dx=dy=0`.
+- rsp fault (`XWBPTYPE=4,XWBP="^"` → capResult gwalk): same — `bt=0 on=0 dx=dy=0`.
+- L3 naked-ref (`^ZZRT("b",1)` indicator across a faulting req): `^(1)=22` restored.
+
+Fidelity honestly stated: non-interference + capture = real socket through the live
+broker; fault path = real installed routine on the real engine under a sentinel outer
+trap (not socket-driven — a socket-driven tap fault isn't achievable without a fault
+hook in the routine, which we will not ship). **OWED: mirror the whole cycle on foia
+(IRIS)** — `--engine iris`, broker host `19430`, `M_IRIS_*` creds.
