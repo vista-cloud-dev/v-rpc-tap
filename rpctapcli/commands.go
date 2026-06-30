@@ -21,4 +21,6 @@ type Commands struct {
 	Status     statusCmd     `cmd:"" group:"Control" help:"Show the armed state + job ring / live record counts." example:"v rpc-tap status --container vehu"`
 	Drain      drainCmd      `cmd:"" group:"Control" help:"Pull live records, correlate into sessions; deletes nothing (D12)." example:"v rpc-tap drain --container vehu"`
 	CommitTrim commitTrimCmd `cmd:"" name:"committrim" group:"Control" help:"Trim the durable ring prefix after a drain is safe in S3 (at-least-once)." example:"v rpc-tap committrim --container vehu --job 123 --seq 42"`
+
+	Load loadCmd `cmd:"" group:"Bench" help:"Drive concurrent [XWB] sessions at a broker and report throughput + latency (L8 load rig)." example:"v rpc-tap load --addr 127.0.0.1:9430 --concurrency 50 --total 500"`
 }
