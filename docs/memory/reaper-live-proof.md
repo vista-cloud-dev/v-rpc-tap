@@ -55,7 +55,11 @@ dist/kids/vslrtap.kids --engine ydb --transport docker` (M_YDB_CONTAINER=vehu) f
 **stage `ZVPKGRD`**: `read VSLRTAP: driver loaded no routine (check the engine's routine
 source path / connection)` — the install's scratch-routine staging/read-back, NOT the
 reaper logic. `m vista exec` (eval) works on the same connection, so it is specific to
-routine *staging* via the docker transport against a VistA image. T0a.3 had the full
+routine *staging* via the docker transport against a VistA image. **Re-confirmed
+2026-06-30 (P4 precondition): `--dry-run` reproduces it identically** (`DRY_RUN_FAILED`,
+same `ZVPKGRD: read VSLRTAP: driver loaded no routine`) — so the snag lives in the
+read/staging plan that dry-run and real install share, and it can be diagnosed
+**non-destructively** (gold master stays pristine, no install needed). T0a.3 had the full
 install/uninstall lifecycle working on vehu, so this looks like a regression or an env
 gap (routine-write path) — needs a focused v-pkg/driver session. The inline proof above
 deliberately bypassed it; the additive install + shipping the `#19` OPTION in the KIDS
