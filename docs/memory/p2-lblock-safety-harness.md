@@ -101,3 +101,35 @@ a fresh in-path append, it must **also SET the record node** at that seq — oth
 later `present(j,lo,hi)` helper fails on the missing node, which looks like a production bug
 but is a test omission. Simulate an append fully (seq counter **and** the `buf,$J,seq` value)
 or drive `req^VSLRTAP()` for real.
+
+---
+
+## L9/L10 — method-C ring/load stress (`tests/VSLRTLDTST.m`)
+
+The third ring suite proves the **fill-vs-drain correctness core** of L9 by driving the
+in-engine path (`work^VSLRTAP` + `drain`/`committrim^VSLRTH` + `overflow`/`depth^VSLRTRP`)
+at volume — **method C** from the deep analysis §6.3. Key property: this needs **no real
+sockets, no splice, no install, and therefore no v-pkg** — it stresses the ring directly.
+Dual-engine 15/15. It does NOT test CF4 (no live socket) and does NOT measure the
+wall-clock throughput knee or `^XTMP` journal bytes — those need engine-native instruments
+under the live 5000-load (L7); a single-process unit suite can only prove the
+*deterministic* correctness, which it does.
+
+**Exact drop accounting = the "no silent loss" guarantee (L9/R20/D14).** Under sustained
+overflow with no draining, `trim`'s drop-oldest pins live **exactly at the depth cap** and
+the `…,"drop"` counter is **exactly `appended − cap`** (e.g. N=5000, cap=1000 → live=1000,
+drop=4000, `live+dropped=appended`). Every discarded record is counted; nothing vanishes
+silently. This is the gate-able core; the *rate* at which the knee is hit is the live-load's
+job.
+
+**Durable operational insight — a stuck host cannot be self-limited by the ring.** If the
+host **drains but never `committrim`s** (a stall after the S3 PUT but before ack, or a dead
+drainer), the drained watermark correctly **forbids `trim` from dropping the undelivered
+prefix** — so `trim` is effectively disabled and the ring grows **unbounded** (zero drops,
+records pile up). The depth cap does NOT bound it in this state. The **only** backstop is the
+reaper's `overflow()` auto-disarm (aggregate depth over `OVCAP` and rising → kill `ON`).
+Consequences for the L11 anchors: `OVCAP` must be set to a sane absolute ceiling, and the
+host MUST `committrim` promptly after each PUT-ack — a host that drains-without-committing
+will trip the overflow disarm rather than lose data (fail-safe, but it stops capture). This
+is why D12's watermark + the reaper overflow are a *pair*: the watermark guarantees no loss,
+the reaper guarantees boundedness.
