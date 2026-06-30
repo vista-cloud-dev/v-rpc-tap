@@ -50,19 +50,21 @@ argumentless-FOR-swallows-WRITE note in [[kernel-vsl-coverage-audit]].)
 from `../m-ydb/dist/`; m-iris did not from `v-rpc-tap` cwd). Container env mirrors vehu:
 `M_IRIS_CONTAINER=foia-t12 … --transport docker`.
 
-**OPEN — `v pkg install` staging snag on the gold masters.** `v pkg install
-dist/kids/vslrtap.kids --engine ydb --transport docker` (M_YDB_CONTAINER=vehu) fails at
-**stage `ZVPKGRD`**: `read VSLRTAP: driver loaded no routine (check the engine's routine
-source path / connection)` — the install's scratch-routine staging/read-back, NOT the
-reaper logic. `m vista exec` (eval) works on the same connection, so it is specific to
-routine *staging* via the docker transport against a VistA image. **Re-confirmed
-2026-06-30 (P4 precondition): `--dry-run` reproduces it identically** (`DRY_RUN_FAILED`,
-same `ZVPKGRD: read VSLRTAP: driver loaded no routine`) — so the snag lives in the
-read/staging plan that dry-run and real install share, and it can be diagnosed
-**non-destructively** (gold master stays pristine, no install needed). T0a.3 had the full
-install/uninstall lifecycle working on vehu, so this looks like a regression or an env
-gap (routine-write path) — needs a focused v-pkg/driver session. The inline proof above
-deliberately bypassed it; the additive install + shipping the `#19` OPTION in the KIDS
-build remain owed for the full live reaper-live close. See [[engine-access-through-driver-stack]],
-[[t0a3-live-install-handoff]] (shared docs memory), and the P2 reaper rows in the
-central tracker.
+**CLOSED 2026-06-30 — `v pkg install` ZVPKGRD snag was an m-ydb env gap, now FIXED;
+P4 install precondition is HEALTHY.** The `stage ZVPKGRD: read VSLRTAP: driver loaded
+no routine` failure was NOT a reaper bug, NOT a v-pkg bug, and NOT a T0a.3 regression:
+the **m-ydb driver's source-store (load/sync) path resolved routine write-dirs from the
+HOST `$ydb_routines` only, never the container** — so against vehu (no host routines) it
+staged nothing, and v-pkg's `runMScript` correctly refused ("driver loaded no routine").
+Root-caused + fixed in **m-ydb** (`Session.ContainerRoutines` auto-discovers the
+container's own `$ZROUTINES` under docker; `config.SourceStore` falls back to it when host
+routines empty — m-ydb commits `7eb90ad`/`ef1ed0e`, memory `m-ydb-docker-gbldir`). **Full
+lifecycle now proven byte-clean on vehu:** `v pkg install vslrtap.kids --engine ydb
+--transport docker --auto-snapshot` → status 3 / installed:true; `verify` → all 3 present;
+`uninstall` → byte-clean (source + `.o` + #9.7 entry + `^XTMP("VPKGI")` gone). So **P4 is
+UNBLOCKED** — drive the splice/live steps. GOTCHAS for the live work: a transient
+`stage-incomplete: 794 of 345 nodes` was stale `^XTMP("VPKGI")` residue (clean
+`VPKGI=0` → 345/345); deleting a stray scratch routine on a VistA engine needs
+`^%ZOSF("DEL")` via `m vista exec` (`m-ydb sync rm` leaves the `.o`; `rm` is deny-gated).
+The `#19` OPTION shipping in the KIDS build + the splice routine remain the actual P4-step-1
+build work. See [[engine-access-through-driver-stack]], [[t0a3-live-install-handoff]].
