@@ -42,7 +42,18 @@ changes, deferrable):**
    the drain J header (backward-compatible append) so the host can report loss without
    a second status call. Until then `ParseDrain` exposes Head/SeqMax but not drops.
 
-Next P3 slices (all v-pkg-independent): the `arm/disarm/status/drain/committrim`
-command surface over `mdriver.Client`/`m vista exec` (drives VSLRTH), then the
-read-only `drain → S3 (GovCloud partition) → committrim-after-ack` pipeline (D12) and
-`validate` vs the native XWBDEBUG oracle. See the central tracker P3 section.
+**Command surface logic built** (`internal/host`, also v-pkg-independent): the `Tap`
+controller drives VSLRTH (`arm/disarm/status/drain/committrim`) over an `Execer` seam
+(`Exec(ctx, command) (string, error)`) — fake-tested, no engine. `Status` parses the
+`on=^epoch=^jobs=^records=` line; `Drain` pipes the raw drain through `ParseDrain`+
+`Correlate`. The **seam pattern mirrors v-rpc-debug** (`capture.Execer` +
+`mdriverExecer` over `mdriver.Client`): the production Execer wraps `mdriver.Client`
+(waterline rule 3); the interface exists only so the command logic is testable without
+an engine.
+
+Next P3 slices: the real `mdriverExecer` adapter + `engineConn` knobs + the kong CLI
+verbs in `rpctapcli` (mirror v-rpc-debug; pulls the clikit/mdriver dep tree) + a live
+smoke — the smoke is **gated on `VSLRTH` being on an engine** (the v-pkg install path,
+currently the `ZVPKGRD` snag in [[reaper-live-proof]]). Then the read-only `drain → S3
+(GovCloud partition) → committrim-after-ack` pipeline (D12) and `validate` vs the native
+XWBDEBUG oracle. See the central tracker P3 section.
