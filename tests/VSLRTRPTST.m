@@ -15,6 +15,10 @@ VSLRTRPTST ; VSL RPC TAP — VSLRTRP off-path reaper tests (YDB+IRIS, bare logic
  do tPurgeRefreshesNode(.pass,.fail)
  do tHealthPublishes(.pass,.fail)
  do tRunCyclesAndNoOpRequeueOnBare(.pass,.fail)
+ do tWatchdogRestartsStaleReaper(.pass,.fail)
+ do tWatchdogNoopFreshReaper(.pass,.fail)
+ do tWatchdogNoopWhenDisarmed(.pass,.fail)
+ do tWatchdogRestartsOnMissingHeartbeat(.pass,.fail)
  do tPastHelper(.pass,.fail)
  do report^STDASSERT(pass,fail)
  quit
@@ -85,6 +89,34 @@ tRunCyclesAndNoOpRequeueOnBare(pass,fail) ;@TEST "run() does a cycle; requeue no
  do run^VSLRTRP()
  do true^STDASSERT(.pass,.fail,$data(^XTMP("VSLRT","health","on")),"cycle ran (health published)")
  do eq^STDASSERT(.pass,.fail,$get(^XTMP("VSLRT","ON")),1,"still armed (fresh lease, no TaskMan fault)")
+ quit
+ ;
+tWatchdogRestartsStaleReaper(pass,fail) ;@TEST "C3b/#19: armed + stale reaper heartbeat -> watchdog restarts (re-queue attempted, counter bumped)"
+ kill ^XTMP("VSLRT")
+ set ^XTMP("VSLRT","ON")=1,^XTMP("VSLRT","health","at")=$$past(-120) ; reaper last beat 2 min ago
+ do watchdog^VSLRTRP()
+ do eq^STDASSERT(.pass,.fail,+$get(^XTMP("VSLRT","health","wdrestart")),1,"watchdog logged one restart on a dead reaper")
+ quit
+ ;
+tWatchdogNoopFreshReaper(pass,fail) ;@TEST "C3b/#19: armed + fresh heartbeat -> watchdog is a no-op (reaper alive)"
+ kill ^XTMP("VSLRT")
+ set ^XTMP("VSLRT","ON")=1,^XTMP("VSLRT","health","at")=$horolog ; just beat
+ do watchdog^VSLRTRP()
+ do eq^STDASSERT(.pass,.fail,+$get(^XTMP("VSLRT","health","wdrestart")),0,"no restart while the reaper is alive")
+ quit
+ ;
+tWatchdogNoopWhenDisarmed(pass,fail) ;@TEST "C3b/#19: disarmed -> watchdog never restarts (nothing to guard)"
+ kill ^XTMP("VSLRT")
+ set ^XTMP("VSLRT","health","at")=$$past(-120) ; stale, but capture is OFF
+ do watchdog^VSLRTRP()
+ do eq^STDASSERT(.pass,.fail,+$get(^XTMP("VSLRT","health","wdrestart")),0,"no restart when disarmed")
+ quit
+ ;
+tWatchdogRestartsOnMissingHeartbeat(pass,fail) ;@TEST "C3b/#19: armed + never-published heartbeat -> treated as dead, restart"
+ kill ^XTMP("VSLRT")
+ set ^XTMP("VSLRT","ON")=1 ; armed but health/at never written (reaper never started)
+ do watchdog^VSLRTRP()
+ do eq^STDASSERT(.pass,.fail,+$get(^XTMP("VSLRT","health","wdrestart")),1,"missing heartbeat -> restart")
  quit
  ;
 tPastHelper(pass,fail) ;@TEST "$$past compares $H correctly"

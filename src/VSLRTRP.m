@@ -33,6 +33,26 @@ requeue() ; re-queue self ~10 s out via Kernel TaskMan. NO-OP on a bare engine (
  do REQ^%ZTLOAD
  quit
  ;
+watchdog() ; #19 OPTION watchdog (C3b): restart the reaper if it died while still armed.
+ ; Runs from its OWN TaskMan-scheduled option (file #19), at a slower cadence than and
+ ; INDEPENDENT of the reaper itself — so it survives the reaper's death (the reaper
+ ; cannot guard its own liveness). Death = the reaper heartbeat
+ ; ^XTMP("VSLRT","health","at") (set every cycle by health()) gone stale, or never
+ ; published, while capture is still armed. The actual #19 OPTION + its TaskMan
+ ; schedule ship in the KIDS build; this is the entry point it calls.
+ new at
+ quit:'$get(^XTMP("VSLRT","ON"))  ; not armed -> nothing to guard
+ set at=$get(^XTMP("VSLRT","health","at"))
+ quit:at]""&'$$stale(at)  ; fresh heartbeat -> reaper alive, leave it be
+ set ^XTMP("VSLRT","health","wdrestart")=1+$get(^XTMP("VSLRT","health","wdrestart"))
+ do start()  ; re-queue the reaper (no-op on a bare engine; live via TaskMan)
+ quit
+ ;
+stale(at) ; 1 if the reaper heartbeat <at> ($H) is older than the watchdog threshold
+ new lim
+ set lim=+$get(^XTMP("VSLRT","WDSEC")) if 'lim set lim=60
+ quit $$past($$plus(at,lim))
+ ;
 cycle() ; one reaper pass — all off-path disable conditions (bare-testable)
  do lease(),duration(),overflow(),orphans(),purge(),health()
  quit
@@ -98,3 +118,9 @@ next() ; $H + ~10 s (the reaper interval) for the next (re)queue
  new s
  set s=$piece($horolog,",",2)+10
  quit $piece($horolog,",",1)_","_s
+ ;
+plus(h,secs) ; return the $H value <h> advanced by <secs> seconds (day rollover)
+ new d,s
+ set d=$piece(h,",",1),s=$piece(h,",",2)+secs
+ for  quit:s<86400  set s=s-86400,d=d+1
+ quit d_","_s
