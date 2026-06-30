@@ -35,9 +35,27 @@ m-test-dual:
 # D10 dependency-purity gate: VSLRT* reference no STD*/external-VSL*, no crypto/json/net
 m-purity:
 	./scripts/purity-check.sh
-# build the VSL RPC TAP KIDS transport global (VSLRT*1.0*1) from the declarative spec
-kids:
-	v pkg build kids/vslrtap.build.json --src src --out dist/kids/vslrtap.kids
+# Build the VSL RPC TAP KIDS transport global (VSLRT*1.0*1) from the declarative
+# spec. The build overwrites the national XWBPRS, so its routine is GENERATED from
+# the TARGET SITE's CURRENT XWBPRS (proposal §12 — never a frozen repo copy): pull
+# it read-only over the driver (`m sync diff/pull`) and pass its path as SPLICE_SRC.
+# The 3 VSLRT* routines come from src/; the spliced XWBPRS is staged alongside them.
+# v pkg ships/installs/restores the result (the audited foreign-overwrite path);
+# nothing here touches a live engine.
+SPLICE_SRC ?=
+KIDS_SRC = dist/build-src
+
+.PHONY: kids   # the `kids` recipe must always run (the kids/ directory would otherwise satisfy it)
+
+dist/rpctap: cmd/rpctap/main.go $(wildcard rpctapcli/*.go) $(wildcard internal/splice/*.go)
+	go build -o dist/rpctap ./cmd/rpctap
+
+kids: dist/rpctap
+	@test -n "$(SPLICE_SRC)" || { echo "kids: set SPLICE_SRC=<the target site's current XWBPRS.m> — pull it read-only via 'm sync diff/pull' over the driver; the splice is regenerated per-site, never a frozen copy"; exit 2; }
+	mkdir -p $(KIDS_SRC) dist/kids
+	cp src/VSLRTAP.m src/VSLRTH.m src/VSLRTRP.m $(KIDS_SRC)/
+	dist/rpctap splice --in "$(SPLICE_SRC)" --out $(KIDS_SRC)/XWBPRS.m
+	v pkg build kids/vslrtap.build.json --src $(KIDS_SRC) --out dist/kids/vslrtap.kids
 m-check: m-fmt-check m-lint m-purity m-test-dual m-coverage
 
 # --- Go side (host; empty until P3) ---

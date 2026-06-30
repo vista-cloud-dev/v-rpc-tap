@@ -3,11 +3,21 @@
   "version": "1.0",
   "patch": "1",
   "allowLongNames": true,
+  "foreignRoutines": ["XWBPRS"],
   "components": {
     "routines": [
       "VSLRTAP",
       "VSLRTH",
-      "VSLRTRP"
+      "VSLRTRP",
+      "XWBPRS"
+    ],
+    "options": [
+      {
+        "name": "VSLRT REAPER",
+        "menuText": "VSL RPC TAP reaper watchdog",
+        "type": "run routine",
+        "routine": "run^VSLRTRP"
+      }
     ]
   }
 }
